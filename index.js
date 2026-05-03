@@ -102,6 +102,50 @@ async function run() {
         res.status(500).send({ message: "Failed to fetch orders" });
       }
     });
+
+    app.patch("/orders/:id", verifyAdmin, async (req, res) => {
+      try {
+        const orderId = req.params.id;
+        const { status, payment } = req.body;
+
+        const update = {
+          updatedAt: new Date(),
+        };
+
+        if (status) update.status = status;
+        if (payment) update.payment = payment;
+
+        const result = await orderCollection.updateOne(
+          { id: orderId },
+          { $set: update },
+        );
+
+        res.send({
+          success: true,
+          message: "Order updated successfully",
+          result,
+        });
+      } catch (err) {
+        res.status(500).send({ message: "Failed to update order" });
+      }
+    });
+
+    app.delete("/orders/:id", verifyAdmin, async (req, res) => {
+      try {
+        const orderId = req.params.id;
+
+        const result = await orderCollection.deleteOne({ id: orderId });
+
+        res.send({
+          success: true,
+          message: "Order deleted successfully",
+          result,
+        });
+      } catch (err) {
+        res.status(500).send({ message: "Failed to delete order" });
+      }
+    });
+    
     app.get("/orders/user", async (req, res) => {
       try {
         const email = req.query.email;
@@ -312,6 +356,36 @@ async function run() {
       res.send(users);
     });
 
+    app.get("/admin/users", verifyAdmin, async (req, res) => {
+      const users = await userCollection.find().toArray();
+      res.send(users);
+    });
+
+    app.patch("/admin/users/:email", verifyAdmin, async (req, res) => {
+      const email = req.params.email;
+      const { role, status } = req.body;
+
+      const update = {};
+
+      if (role) update.role = role;
+      if (status) update.status = status;
+
+      const result = await userCollection.updateOne(
+        { email },
+        { $set: update },
+      );
+
+      res.send(result);
+    });
+
+    app.delete("/admin/users/:email", verifyAdmin, async (req, res) => {
+      const email = req.params.email;
+
+      const result = await userCollection.deleteOne({ email });
+
+      res.send(result);
+    });
+
     app.get("/users", async (req, res) => {
       const email = req.query.email;
 
@@ -368,6 +442,7 @@ async function run() {
 
       res.send(result);
     });
+
     console.log(
       "Pinged your deployment. You successfully connected to MongoDB!",
     );
