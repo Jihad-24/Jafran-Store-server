@@ -25,6 +25,7 @@ async function run() {
     const brandsCollection = client.db("JafranStore").collection("brands");
     const cartCollection = client.db("JafranStore").collection("cart");
     const userCollection = client.db("JafranStore").collection("users");
+    const orderCollection = client.db("JafranStore").collection("orders");
 
     // prduct related apis
 
@@ -67,6 +68,64 @@ async function run() {
       const quary = { brand: new ObjectId(brand) };
       const result = await productCollection.findOne(quary);
       res.send(result);
+    });
+
+    const verifyAdmin = async (req, res, next) => {
+      const email = req.query.email;
+
+      if (!email) {
+        return res.status(403).send({ message: "Forbidden" });
+      }
+
+      const user = await userCollection.findOne({ email });
+
+      if (user?.role !== "admin") {
+        return res.status(403).send({ message: "Admin only" });
+      }
+
+      next();
+    };
+
+    app.get("/orders", verifyAdmin, async (req, res) => {
+      try {
+        const orders = await orderCollection
+          .find()
+          .sort({ createdAt: -1 })
+          .toArray();
+
+        res.send({
+          success: true,
+          total: orders.length,
+          data: orders,
+        });
+      } catch (err) {
+        res.status(500).send({ message: "Failed to fetch orders" });
+      }
+    });
+    app.get("/orders/user", async (req, res) => {
+      try {
+        const email = req.query.email;
+
+        if (!email) {
+          return res.status(400).send({
+            success: false,
+            message: "Email is required",
+          });
+        }
+
+        const orders = await orderCollection
+          .find({ "customer.email": email })
+          .sort({ createdAt: -1 })
+          .toArray();
+
+        res.send(orders);
+      } catch (err) {
+        console.error("User orders error:", err);
+        res.status(500).send({
+          success: false,
+          message: "Failed to fetch user orders",
+        });
+      }
     });
 
     app.post("/cart/merge", async (req, res) => {
@@ -149,6 +208,40 @@ async function run() {
       res.send(result);
     });
 
+    app.post("/orders", async (req, res) => {
+      try {
+        const order = req.body;
+
+        // ✅ validation
+        if (!order.customer?.email || !order.items?.length) {
+          return res.status(400).send({
+            success: false,
+            message: "Invalid order data",
+          });
+        }
+
+        const newOrder = {
+          ...order,
+          status: "pending", // important for admin tracking
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+
+        const result = await orderCollection.insertOne(newOrder);
+
+        res.send({
+          success: true,
+          orderId: result.insertedId,
+        });
+      } catch (err) {
+        console.error("Order error:", err);
+        res.status(500).send({
+          success: false,
+          message: "Failed to create order",
+        });
+      }
+    });
+    
     app.put("/product/:id", async (req, res) => {
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) };
@@ -207,12 +300,24 @@ async function run() {
 
     // user related apis
 
-    app.get("/users", async (req, res) => {
+    app.get("/allusers", async (req, res) => {
       const email = req.query.email;
 
       if (email) {
         const user = await userCollection.find({ email }).toArray();
         return res.send(user);
+      }
+
+      const users = await userCollection.find().toArray();
+      res.send(users);
+    });
+
+    app.get("/users", async (req, res) => {
+      const email = req.query.email;
+
+      if (email) {
+        const user = await userCollection.findOne({ email }); // ✅ FIXED
+        return res.send(user || null);
       }
 
       const users = await userCollection.find().toArray();
@@ -228,7 +333,7 @@ async function run() {
 
       const result = await userCollection.updateOne(
         { email },
-        { $set: { photoURL } },
+        { $set: { photoURL, updatedAt: new Date() } },
       );
 
       res.send(result);
@@ -248,12 +353,12 @@ async function run() {
           photoURL: user.photoURL || "",
           name: user.name || "",
           provider: user.provider || "email",
-          lastLogin: new Date(), // 👈 updates every login
+          lastLogin: new Date(),
         },
         $setOnInsert: {
           email: user.email,
-          role: user.role || "user",
-          createdAt: user.createdAt || new Date(),
+          role: "user",
+          createdAt: new Date(),
         },
       };
 
@@ -263,7 +368,6 @@ async function run() {
 
       res.send(result);
     });
-
     console.log(
       "Pinged your deployment. You successfully connected to MongoDB!",
     );
