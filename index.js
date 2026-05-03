@@ -22,7 +22,7 @@ const client = new MongoClient(uri, {
 async function run() {
   try {
     const productCollection = client.db("JafranStore").collection("products");
-    const brandsCollection = client.db("JafranStore").collection("brands");
+    const bannerCollection = client.db("JafranStore").collection("banners");
     const cartCollection = client.db("JafranStore").collection("cart");
     const userCollection = client.db("JafranStore").collection("users");
     const orderCollection = client.db("JafranStore").collection("orders");
@@ -50,8 +50,8 @@ async function run() {
       res.send(result);
     });
 
-    app.get("/brands", async (req, res) => {
-      const cursor = brandsCollection.find();
+    app.get("/banners", async (req, res) => {
+      const cursor = bannerCollection.find();
       const result = await cursor.toArray();
       res.send(result);
     });
@@ -59,13 +59,6 @@ async function run() {
     app.get("/items/:id", async (req, res) => {
       const id = req.params.id;
       const quary = { _id: new ObjectId(id) };
-      const result = await productCollection.findOne(quary);
-      res.send(result);
-    });
-
-    app.get("/brands/:brandName", async (req, res) => {
-      const brand = req.params.brand;
-      const quary = { brand: new ObjectId(brand) };
       const result = await productCollection.findOne(quary);
       res.send(result);
     });
@@ -145,7 +138,7 @@ async function run() {
         res.status(500).send({ message: "Failed to delete order" });
       }
     });
-    
+
     app.get("/orders/user", async (req, res) => {
       try {
         const email = req.query.email;
@@ -249,6 +242,31 @@ async function run() {
     app.post("/products", async (req, res) => {
       const newProduct = req.body;
       const result = await productCollection.insertOne(newProduct);
+      res.send(result);
+    });
+
+    app.post("/banners", verifyAdmin, async (req, res) => {
+      try {
+        const newBanner = {
+          ...req.body,
+          createdAt: new Date(),
+        };
+
+        const result = await bannerCollection.insertOne(newBanner);
+
+        res.send({
+          success: true,
+          message: "Banner created successfully",
+          result,
+        });
+      } catch (err) {
+        res.status(500).send({ message: "Failed to create banner" });
+      }
+    });
+    app.delete("/banners/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await bannerCollection.deleteOne(query);
       res.send(result);
     });
 
