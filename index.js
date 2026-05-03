@@ -208,20 +208,59 @@ async function run() {
     // user related apis
 
     app.get("/users", async (req, res) => {
-  const email = req.query.email;
+      const email = req.query.email;
 
-  if (email) {
-    const user = await userCollection.find({ email }).toArray();
-    return res.send(user);
-  }
+      if (email) {
+        const user = await userCollection.find({ email }).toArray();
+        return res.send(user);
+      }
 
-  const users = await userCollection.find().toArray();
-  res.send(users);
-});
+      const users = await userCollection.find().toArray();
+      res.send(users);
+    });
+
+    app.patch("/users/avatar", async (req, res) => {
+      const { email, photoURL } = req.body;
+
+      if (!email || !photoURL) {
+        return res.status(400).send({ message: "Missing data" });
+      }
+
+      const result = await userCollection.updateOne(
+        { email },
+        { $set: { photoURL } },
+      );
+
+      res.send(result);
+    });
 
     app.post("/users", async (req, res) => {
       const user = req.body;
-      const result = await userCollection.insertOne(user);
+
+      if (!user.email) {
+        return res.status(400).send({ message: "Email required" });
+      }
+
+      const filter = { email: user.email };
+
+      const updateDoc = {
+        $set: {
+          photoURL: user.photoURL || "",
+          name: user.name || "",
+          provider: user.provider || "email",
+          lastLogin: new Date(), // 👈 updates every login
+        },
+        $setOnInsert: {
+          email: user.email,
+          role: user.role || "user",
+          createdAt: user.createdAt || new Date(),
+        },
+      };
+
+      const options = { upsert: true };
+
+      const result = await userCollection.updateOne(filter, updateDoc, options);
+
       res.send(result);
     });
 
