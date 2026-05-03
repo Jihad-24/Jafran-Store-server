@@ -241,7 +241,7 @@ async function run() {
         });
       }
     });
-    
+
     app.put("/product/:id", async (req, res) => {
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) };
@@ -316,7 +316,7 @@ async function run() {
       const email = req.query.email;
 
       if (email) {
-        const user = await userCollection.findOne({ email }); // ✅ FIXED
+        const user = await userCollection.findOne({ email });
         return res.send(user || null);
       }
 
