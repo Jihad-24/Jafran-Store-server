@@ -1,142 +1,242 @@
 const express = require("express");
-const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const cors = require("cors");
-require('dotenv').config()
+require("dotenv").config();
 const app = express();
 const port = process.env.PORT || 5001;
 
-// middleware 
+// middleware
 app.use(express.json());
 app.use(cors());
-
-
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.8urwnno.mongodb.net/?retryWrites=true&w=majority`;
 
 const client = new MongoClient(uri, {
-    serverApi: {
-        version: ServerApiVersion.v1,
-        strict: true,
-        deprecationErrors: true,
-    }
+  serverApi: {
+    version: ServerApiVersion.v1,
+    strict: true,
+    deprecationErrors: true,
+  },
 });
 
 async function run() {
-    try {
+  try {
+    const productCollection = client.db("JafranStore").collection("products");
+    const brandsCollection = client.db("JafranStore").collection("brands");
+    const cartCollection = client.db("JafranStore").collection("cart");
+    const userCollection = client.db("JafranStore").collection("users");
 
-        const productCollection = client.db('OdysseyApp').collection('products');
-        const brandsCollection = client.db('OdysseyApp').collection('brands');
-        const cartCollection = client.db('OdysseyApp').collection('mycart');
-        const userCollection = client.db('OdysseyApp').collection('users');
+    // prduct related apis
 
-        // prduct related apis
+    app.get("/products", async (req, res) => {
+      const cursor = productCollection.find();
+      const result = await cursor.toArray();
+      res.send(result);
+    });
 
-        app.get('/products', async (req, res) => {
-            const cursor = productCollection.find();
-            const result = await cursor.toArray();
-            res.send(result);
-        })
+    app.get("/cart", async (req, res) => {
+      const email = req.query.email;
 
-        app.get('/mycart', async (req, res) => {
-            const cursor = cartCollection.find();
-            const result = await cursor.toArray();
-            res.send(result)
-        })
+      const result = await cartCollection.find({ userEmail: email }).toArray();
 
-        app.get('/brands', async (req, res) => {
-            const cursor = brandsCollection.find();
-            const result = await cursor.toArray();
-            res.send(result);
-        })
+      res.send(result);
+    });
 
-        app.get('/items/:id', async (req, res) => {
-            const id = req.params.id;
-            const quary = { _id: new ObjectId(id) };
-            const result = await productCollection.findOne(quary);
-            res.send(result);
-        })
+    app.get("/cart/:id", async (req, res) => {
+      const id = req.params.id;
+      const quary = { _id: new ObjectId(id) };
+      const result = await cartCollection.findOne(quary);
+      res.send(result);
+    });
 
-        app.get('/brands/:brandName', async (req, res) => {
-            const brand = req.params.brand;
-            const quary = { brand: new ObjectId(brand) };
-            const result = await productCollection.findOne(quary);
-            res.send(result);
-        })
+    app.get("/brands", async (req, res) => {
+      const cursor = brandsCollection.find();
+      const result = await cursor.toArray();
+      res.send(result);
+    });
 
-        app.post('/mycart', async (req, res) => {
-            const addProduct = req.body;
-            const result = await cartCollection.insertOne(addProduct)
-            res.send(result)
-        })
+    app.get("/items/:id", async (req, res) => {
+      const id = req.params.id;
+      const quary = { _id: new ObjectId(id) };
+      const result = await productCollection.findOne(quary);
+      res.send(result);
+    });
 
-        app.post('/products', async (req, res) => {
-            const newProduct = req.body;
-            const result = await productCollection.insertOne(newProduct)
-            res.send(result)
-        })
+    app.get("/brands/:brandName", async (req, res) => {
+      const brand = req.params.brand;
+      const quary = { brand: new ObjectId(brand) };
+      const result = await productCollection.findOne(quary);
+      res.send(result);
+    });
 
-        app.put('/product/:id', async (req, res) => {
-            const id = req.params.id;
-            const filter = { _id: new ObjectId(id) };
-            const options = { upsert: true };
-            const updatedProduct = req.body;
-            const product = {
-                $set: {
-                    name: updatedProduct.name,
-                    price: updatedProduct.price,
-                    brand: updatedProduct.brand,
-                    type: updatedProduct.type,
-                    rating: updatedProduct.rating,
-                    details: updatedProduct.details,
-                    photo: updatedProduct.photo
-                }
-            }
-            const result = await productCollection.updateOne(filter, product, options)
-            res.send(result);
-        })
+    app.post("/cart/merge", async (req, res) => {
+      const { email, items } = req.body;
 
-        app.delete('/products/:id', async (req, res) => {
-            const id = req.params.id;
-            const quary = { _id: new ObjectId(id) };
-            const result = await productCollection.deleteOne(quary);
-            res.send(result);
-        })
-        app.delete('/mycart/:id', async (req, res) => {
-            const id = req.params.id;
-            const quary = { _id: new ObjectId(id) };
-            const result = await cartCollection.deleteOne(quary);
-            res.send(result);
-        })
+      if (!email || !items) {
+        return res.status(400).send({ message: "Missing data" });
+      }
 
-        // user related apis
+      try {
+        const userCart = await cartCollection
+          .find({ userEmail: email })
+          .toArray();
 
-        app.get('/user', async (req, res) => {
-            const cursor = userCollection.find();
-            const users = await cursor.toArray();
-            res.send(users);
-        })
+        for (let item of items) {
+          const existing = userCart.find((i) => i.productId === item.productId);
 
-        app.post('/user', async (req, res) => {
-            const user = req.body;
-            const result = await userCollection.insertOne(user);
-            res.send(result);
-        })
+          if (existing) {
+            await cartCollection.updateOne(
+              { _id: existing._id },
+              { $inc: { qty: item.qty } },
+            );
+          } else {
+            await cartCollection.insertOne({
+              ...item,
+              userEmail: email,
+            });
+          }
+        }
 
-        console.log("Pinged your deployment. You successfully connected to MongoDB!");
-    } finally {
+        res.send({ success: true, message: "Cart merged" });
+      } catch (err) {
+        console.error(err);
+        res.status(500).send({ message: "Merge failed" });
+      }
+    });
 
-    }
+    app.post("/cart", async (req, res) => {
+      try {
+        const item = req.body;
+
+        const query = {
+          userEmail: item.userEmail,
+          productId: item.productId,
+        };
+
+        const existing = await cartCollection.findOne(query);
+
+        if (existing) {
+          // update quantity
+          const result = await cartCollection.updateOne(query, {
+            $inc: { qty: item.qty },
+          });
+          return res.send(result);
+        }
+
+        const result = await cartCollection.insertOne(item);
+        res.send(result);
+      } catch (err) {
+        console.error(err);
+        res.status(500).send("Error adding to cart");
+      }
+    });
+
+    app.patch("/cart/:id", async (req, res) => {
+      const id = req.params.id;
+      const { qty } = req.body;
+
+      const result = await cartCollection.updateOne(
+        { _id: new ObjectId(id) },
+        { $set: { qty } },
+      );
+
+      res.send(result);
+    });
+
+    app.post("/products", async (req, res) => {
+      const newProduct = req.body;
+      const result = await productCollection.insertOne(newProduct);
+      res.send(result);
+    });
+
+    app.put("/product/:id", async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const options = { upsert: true };
+      const updatedProduct = req.body;
+      const product = {
+        $set: {
+          name: updatedProduct.name,
+          price: updatedProduct.price,
+          brand: updatedProduct.brand,
+          type: updatedProduct.type,
+          rating: updatedProduct.rating,
+          details: updatedProduct.details,
+          photo: updatedProduct.photo,
+        },
+      };
+      const result = await productCollection.updateOne(
+        filter,
+        product,
+        options,
+      );
+      res.send(result);
+    });
+
+    app.delete("/products/:id", async (req, res) => {
+      const id = req.params.id;
+      const quary = { _id: new ObjectId(id) };
+      const result = await productCollection.deleteOne(quary);
+      res.send(result);
+    });
+    // app.delete("/cart/:id", async (req, res) => {
+    //   const id = req.params.id;
+    //   const quary = { _id: new ObjectId(id) };
+    //   const result = await cartCollection.deleteOne(quary);
+    //   res.send(result);
+    // });
+    app.delete("/cart/:id", async (req, res) => {
+      const id = req.params.id;
+
+      const result = await cartCollection.deleteOne({
+        _id: new ObjectId(id),
+      });
+
+      res.send(result);
+    });
+
+    app.delete("/cart", async (req, res) => {
+      const email = req.query.email;
+
+      const result = await cartCollection.deleteMany({
+        userEmail: email,
+      });
+
+      res.send(result);
+    });
+
+    // user related apis
+
+    app.get("/users", async (req, res) => {
+  const email = req.query.email;
+
+  if (email) {
+    const user = await userCollection.find({ email }).toArray();
+    return res.send(user);
+  }
+
+  const users = await userCollection.find().toArray();
+  res.send(users);
+});
+
+    app.post("/users", async (req, res) => {
+      const user = req.body;
+      const result = await userCollection.insertOne(user);
+      res.send(result);
+    });
+
+    console.log(
+      "Pinged your deployment. You successfully connected to MongoDB!",
+    );
+  } finally {
+  }
 }
 run().catch(console.dir);
 
-
-
 app.get("/", (req, res) => {
-    res.send("my OdysseyApp server is running...");
+  res.send("my jafran store server is running...");
 });
-
 
 app.listen(port, () => {
-    console.log(`Simple Crud is Running on port ${port}`);
+  console.log(`jafran store is Running on port ${port}`);
 });
-
