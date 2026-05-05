@@ -349,29 +349,29 @@ async function run() {
       }
     });
 
-    app.put("/product/:id", async (req, res) => {
-      const id = req.params.id;
-      const filter = { _id: new ObjectId(id) };
-      const options = { upsert: true };
-      const updatedProduct = req.body;
-      const product = {
-        $set: {
-          name: updatedProduct.name,
-          price: updatedProduct.price,
-          brand: updatedProduct.brand,
-          type: updatedProduct.type,
-          rating: updatedProduct.rating,
-          details: updatedProduct.details,
-          photo: updatedProduct.photo,
-        },
-      };
-      const result = await productCollection.updateOne(
-        filter,
-        product,
-        options,
-      );
-      res.send(result);
-    });
+    // app.put("/product/:id", async (req, res) => {
+    //   const id = req.params.id;
+    //   const filter = { _id: new ObjectId(id) };
+    //   const options = { upsert: true };
+    //   const updatedProduct = req.body;
+    //   const product = {
+    //     $set: {
+    //       name: updatedProduct.name,
+    //       price: updatedProduct.price,
+    //       brand: updatedProduct.brand,
+    //       type: updatedProduct.type,
+    //       rating: updatedProduct.rating,
+    //       details: updatedProduct.details,
+    //       photo: updatedProduct.photo,
+    //     },
+    //   };
+    //   const result = await productCollection.updateOne(
+    //     filter,
+    //     product,
+    //     options,
+    //   );
+    //   res.send(result);
+    // });
 
     app.delete("/products/:id", async (req, res) => {
       try {
@@ -389,7 +389,7 @@ async function run() {
         res.status(500).send({ success: false, message: err.message });
       }
     });
-    
+
     // app.delete("/cart/:id", async (req, res) => {
     //   const id = req.params.id;
     //   const quary = { _id: new ObjectId(id) };
