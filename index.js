@@ -264,18 +264,18 @@ async function run() {
     app.patch("/products/:id", async (req, res) => {
       try {
         const id = req.params.id;
-        const updatedData = req.body;
 
-        // ensure images is array
-        if (updatedData.images && !Array.isArray(updatedData.images)) {
-          updatedData.images = [updatedData.images];
+        const { _id, id: ignoreId, ...safeData } = req.body;
+
+        if (safeData.images && !Array.isArray(safeData.images)) {
+          safeData.images = [safeData.images];
         }
 
         const result = await productsCollection.updateOne(
           { _id: new ObjectId(id) },
           {
             $set: {
-              ...updatedData,
+              ...safeData,
               updatedAt: new Date(),
             },
           },
@@ -286,7 +286,11 @@ async function run() {
           data: result,
         });
       } catch (err) {
-        res.status(500).send({ success: false, message: err.message });
+        console.error(err); // 👈 important for debugging
+        res.status(500).send({
+          success: false,
+          message: err.message,
+        });
       }
     });
 
