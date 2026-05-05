@@ -240,9 +240,54 @@ async function run() {
     });
 
     app.post("/products", async (req, res) => {
-      const newProduct = req.body;
-      const result = await productCollection.insertOne(newProduct);
-      res.send(result);
+      try {
+        const product = req.body;
+
+        // normalize images
+        if (!product.images || !Array.isArray(product.images)) {
+          product.images = [];
+        }
+
+        product.createdAt = new Date();
+
+        const result = await productCollection.insertOne(product);
+
+        res.send({
+          success: true,
+          data: result,
+        });
+      } catch (err) {
+        res.status(500).send({ success: false, message: err.message });
+      }
+    });
+
+    app.patch("/products/:id", async (req, res) => {
+      try {
+        const id = req.params.id;
+        const updatedData = req.body;
+
+        // ensure images is array
+        if (updatedData.images && !Array.isArray(updatedData.images)) {
+          updatedData.images = [updatedData.images];
+        }
+
+        const result = await productsCollection.updateOne(
+          { _id: new ObjectId(id) },
+          {
+            $set: {
+              ...updatedData,
+              updatedAt: new Date(),
+            },
+          },
+        );
+
+        res.send({
+          success: true,
+          data: result,
+        });
+      } catch (err) {
+        res.status(500).send({ success: false, message: err.message });
+      }
     });
 
     app.post("/banners", verifyAdmin, async (req, res) => {
@@ -329,11 +374,22 @@ async function run() {
     });
 
     app.delete("/products/:id", async (req, res) => {
-      const id = req.params.id;
-      const quary = { _id: new ObjectId(id) };
-      const result = await productCollection.deleteOne(quary);
-      res.send(result);
+      try {
+        const id = req.params.id;
+
+        const result = await productsCollection.deleteOne({
+          _id: new ObjectId(id),
+        });
+
+        res.send({
+          success: true,
+          data: result,
+        });
+      } catch (err) {
+        res.status(500).send({ success: false, message: err.message });
+      }
     });
+    
     // app.delete("/cart/:id", async (req, res) => {
     //   const id = req.params.id;
     //   const quary = { _id: new ObjectId(id) };
