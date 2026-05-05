@@ -271,7 +271,7 @@ async function run() {
           safeData.images = [safeData.images];
         }
 
-        const result = await productsCollection.updateOne(
+        const result = await productCollection.updateOne(
           { _id: new ObjectId(id) },
           {
             $set: {
@@ -381,7 +381,7 @@ async function run() {
       try {
         const id = req.params.id;
 
-        const result = await productsCollection.deleteOne({
+        const result = await productCollection.deleteOne({
           _id: new ObjectId(id),
         });
 
