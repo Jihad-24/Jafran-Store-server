@@ -227,16 +227,41 @@ async function run() {
       }
     });
 
+    // app.patch("/cart/:id", async (req, res) => {
+    //   const id = req.params.id;
+    //   const { qty } = req.body;
+
+    //   const result = await cartCollection.updateOne(
+    //     { _id: new ObjectId(id) },
+    //     { $set: { qty } },
+    //   );
+
+    //   res.send(result);
+    // });
+
     app.patch("/cart/:id", async (req, res) => {
-      const id = req.params.id;
-      const { qty } = req.body;
+      try {
+        const id = req.params.id;
+        const { qty, selectedSize, selectedColor } = req.body;
 
-      const result = await cartCollection.updateOne(
-        { _id: new ObjectId(id) },
-        { $set: { qty } },
-      );
+        const updateFields = {};
 
-      res.send(result);
+        if (qty !== undefined) updateFields.qty = qty;
+        if (selectedSize !== undefined)
+          updateFields.selectedSize = selectedSize;
+        if (selectedColor !== undefined)
+          updateFields.selectedColor = selectedColor;
+
+        const result = await cartCollection.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: updateFields },
+        );
+
+        res.send(result);
+      } catch (err) {
+        console.error(err);
+        res.status(500).send({ success: false, message: "Cart update failed" });
+      }
     });
 
     app.post("/products", async (req, res) => {
